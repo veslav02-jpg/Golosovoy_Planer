@@ -1,0 +1,12 @@
+{
+  "name": "Планер",
+  "short_name": "Планер",
+  "description": "Личный планер дня с синком, голосовым вводом и Notion",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#101018",
+  "theme_color": "#5b5bd6",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

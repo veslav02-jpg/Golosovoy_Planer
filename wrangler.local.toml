@@ -1,0 +1,22 @@
+# Локальная конфигурация: без биндинга AI (Workers AI локально требует токен).
+# Запуск: npm run dev:local
+# Бот и Notion локально не работают (нужен публичный https) — но API, синк и экраны работают.
+
+name = "planner-local"
+main = "server/worker.js"
+compatibility_date = "2025-09-01"
+
+[assets]
+directory = "./dist"
+run_worker_first = ["/api/*"]
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "planner"
+database_id = "local"
+
+# Локальный тестовый токен бота — НЕ настоящий секрет, только чтобы
+# /api/auth/telegram работал локально. Ключ для браузера: node scripts/devkey.mjs
+[vars]
+BOT_TOKEN = "12345:LOCAL-TEST-TOKEN"

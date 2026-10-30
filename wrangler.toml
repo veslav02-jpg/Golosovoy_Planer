@@ -1,0 +1,32 @@
+# === ВАЖНО ===
+# Замените REPLACE_WITH_D1_ID на свой Database ID из Cloudflare:
+# Dashboard → Storage & Databases → D1 → ваша база → Details → Database ID.
+# Подробности в README, раздел «Деплой».
+
+name = "planner"
+main = "server/worker.js"
+compatibility_date = "2025-09-01"
+
+[assets]
+directory = "./dist"
+# Только запросы /api/* попадают в Worker, остальное — статика (SPA)
+run_worker_first = ["/api/*"]
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "planner"
+database_id = "REPLACE_WITH_D1_ID"
+
+# Workers AI: Whisper (голос) + Llama (разбор задач)
+[ai]
+binding = "AI"
+
+# Каждые 5 минут: синк с Notion + напоминания о привычках
+[triggers]
+crons = ["*/5 * * * *"]
+
+# Секреты НЕ хранятся здесь. Добавляются в дашборде:
+# Worker → Settings → Variables and Secrets → Add (тип Secret):
+#   BOT_TOKEN   — токен от @BotFather
+#   SERVICE_KEY — (по желанию) ключ для внешних автоматизаций
