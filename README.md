@@ -52,15 +52,15 @@ npm test                 # 36 тестов: парсер, автоплан, по
 
 ### 2. Cloudflare D1 — база
 
-- [ ] Dashboard → **Storage & Databases → D1 → Create** → имя `planner`.
-- [ ] Скопируй **Database ID** и вставь в `wrangler.toml` вместо `REPLACE_WITH_D1_ID`, закоммить.
+- [x] База `planner` создана, её Database ID уже вписан в `wrangler.toml`
+      (`7c4964e8-8f49-404e-a130-f66e2255de75`). Если заведёте новую базу — замените ID на её.
 - [ ] SQL руками не нужен — таблицы создаются сами при первом запросе.
 
 ### 3. Cloudflare Worker из GitHub
 
 - [ ] **Workers & Pages → Create → Import a repository** → выбери репо.
 - [ ] Build command: `npm run build` · Deploy command: `npx wrangler deploy` · Root: `/`.
-- [ ] Дождись статуса **Ready** и открой `https://<имя>.<аккаунт>.workers.dev/api/health` → должно быть `{"ok":true}`.
+- [ ] Дождись статуса **Ready** и открой `https://golosovoy-planer.<аккаунт>.workers.dev/api/health` → должно быть `{"ok":true}`.
 - [ ] Workers AI и cron подтянутся из `wrangler.toml` сами.
 
 ### 4. Секреты

@@ -1,22 +1,20 @@
-# === ВАЖНО ===
-# Замените REPLACE_WITH_D1_ID на свой Database ID из Cloudflare:
-# Dashboard → Storage & Databases → D1 → ваша база → Details → Database ID.
-# Подробности в README, раздел «Деплой».
-
-name = "planner"
+# Имя Worker'а в Cloudflare (совпадает с Workers Builds)
+name = "golosovoy-planer"
 main = "server/worker.js"
 compatibility_date = "2025-09-01"
+
+# === D1 ===
+# Database ID вашей базы (Dashboard → Storage & Databases → D1 → planner).
+[[d1_databases]]
+binding = "DB"
+database_name = "planner"
+database_id = "7c4964e8-8f49-404e-a130-f66e2255de75"
 
 [assets]
 directory = "./dist"
 # Только запросы /api/* попадают в Worker, остальное — статика (SPA)
 run_worker_first = ["/api/*"]
 not_found_handling = "single-page-application"
-
-[[d1_databases]]
-binding = "DB"
-database_name = "planner"
-database_id = "REPLACE_WITH_D1_ID"
 
 # Workers AI: Whisper (голос) + Llama (разбор задач)
 [ai]
