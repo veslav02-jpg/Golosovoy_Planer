@@ -170,24 +170,65 @@ async function parseWithAI(env, chatId, text) {
     { role: 'system', content: system },
     { role: 'user', content: user },
   ];
-  let raw;
+  // Попытка 1 — JSON-режим по схеме; если схема не выдержана (ошибка или мусор) —
+  // попытка 2 без response_format, JSON вытаскиваем из текста ответа.
+  let raw = '';
+  let parsed = null;
   try {
-    const out = await env.AI.run(LLAMA, { messages, response_format: { type: 'json_schema', json_schema: { name: 'tasks', schema: SCHEMA } } });
-    raw = out?.response ?? out;
-  } catch {
-    const out = await env.AI.run(LLAMA, { messages });
-    raw = out?.response ?? out;
+    raw = await callLlama(env, messages, true);
+    parsed = normalizeParsed(extractJSON(raw), today);
+  } catch (e) {
+    console.error('bot: schema attempt failed:', e?.message);
   }
-  return normalizeParsed(extractJSON(String(raw || '')), today);
+  if (!parsed) {
+    try {
+      raw = await callLlama(env, messages, false);
+      parsed = normalizeParsed(extractJSON(raw), today);
+    } catch (e) {
+      console.error('bot: plain attempt failed:', e?.message);
+    }
+  }
+  if (!parsed) {
+    console.error('bot: unparsable model output:', String(raw).slice(0, 800));
+  }
+  return parsed;
+}
+
+async function callLlama(env, messages, withSchema) {
+  const params = { messages };
+  if (withSchema) params.response_format = { type: 'json_schema', json_schema: SCHEMA };
+  const out = await env.AI.run(LLAMA, params);
+  if (out && typeof out === 'object' && out.response !== undefined && out.response !== null) {
+    return out.response; // строка или уже готовый объект — разберёт extractJSON
+  }
+  return out;
 }
 
 function extractJSON(s) {
-  const cleaned = s.replace(/```json/gi, '```').split('```').join('\n');
-  try { return JSON.parse(cleaned); } catch { /* дальше — поиск объекта */ }
-  const start = cleaned.indexOf('{');
-  const end = cleaned.lastIndexOf('}');
+  if (s == null) return null;
+  if (typeof s === 'object') return s; // уже разобранный JSON от модели
+  const text = String(s);
+  // готовый JSON целиком
+  try { return JSON.parse(text); } catch { /* дальше — поиск внутри текста */ }
+  // блок в ```json … ``` или ``` … ```
+  const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
+  if (fence) {
+    try { return JSON.parse(fence[1].trim()); } catch { /* дальше */ }
+  }
+  // первый { … последний }
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
   if (start >= 0 && end > start) {
-    try { return JSON.parse(cleaned.slice(start, end + 1)); } catch { return null; }
+    try { return JSON.parse(text.slice(start, end + 1)); } catch { /* дальше */ }
+  }
+  // голый массив задач → {tasks: [...]}
+  const as = text.indexOf('[');
+  const ae = text.lastIndexOf(']');
+  if (as >= 0 && ae > as) {
+    try {
+      const arr = JSON.parse(text.slice(as, ae + 1));
+      if (Array.isArray(arr)) return { tasks: arr };
+    } catch { /* не JSON */ }
   }
   return null;
 }

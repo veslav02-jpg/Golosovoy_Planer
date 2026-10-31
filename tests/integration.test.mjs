@@ -132,6 +132,35 @@ test('/start отвечает приветствием с кнопкой', async
   assert.ok(sent[0].body.reply_markup.inline_keyboard[0][0].web_app);
 });
 
+test('Llama вернула готовый объект в response — задача сохраняется', async () => {
+  const tomorrow = new Date();
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  env.AI = { async run(model, params) {
+    if (params.response_format) throw new Error('schema unsupported');
+    return { response: { tasks: [{ title: 'объект-тест', date: tomorrow.toISOString().slice(0, 10), time: null, duration_min: 30, area: null, important: false }], summary: 'ок' } };
+  } };
+  await sendWebhook({ message: { chat: { id: 777 }, text: 'объект-тест завтра' } });
+  const pull = await worker.fetch(jsonReq('http://x/api/pull', { headers: h() }), env, makeCtx());
+  const data = await pull.json();
+  assert.ok(data.tasks.some((t) => t.title === 'объект-тест'), 'задача из объектного ответа есть');
+});
+
+test('Llama завернула JSON в ```json фенс — задача сохраняется', async () => {
+  const tomorrow = new Date();
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  env.AI = { async run(model, params) {
+    if (params.response_format) throw new Error('schema unsupported');
+    const payload = JSON.stringify({ tasks: [{ title: 'фенс-тест', date: tomorrow.toISOString().slice(0, 10), time: '10:00', duration_min: 15, area: null, important: false }], summary: '' });
+    return { response: `\`\`\`json\n${payload}\n\`\`\`` };
+  } };
+  await sendWebhook({ message: { chat: { id: 777 }, text: 'фенс-тест завтра в 10' } });
+  const pull = await worker.fetch(jsonReq('http://x/api/pull', { headers: h() }), env, makeCtx());
+  const data = await pull.json();
+  const t = data.tasks.find((x) => x.title === 'фенс-тест');
+  assert.ok(t, 'задача из фенса есть');
+  assert.equal(t.time, '10:00');
+});
+
 // ---------- Notion ----------
 
 async function connectNotion() {
