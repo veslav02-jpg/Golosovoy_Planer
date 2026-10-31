@@ -1,7 +1,7 @@
 // Напоминания о задачах: когда наступает время события — будильник в приложении
 // (+ системное уведомление, если разрешено). Бот дублирует сообщением (server/cron.js).
 import { useStore } from './store.js';
-import { playAlarm } from './lib/audio.js';
+import { playSound } from './lib/audio.js';
 import { todayStr, parseHHMM } from './lib/dates.js';
 
 const STORE_KEY = 'planner-notified';
@@ -50,7 +50,7 @@ export function check() {
     notified[k] = { date: today, at: Date.now() };
     changed = true;
 
-    if (settings.soundOn !== false) playAlarm();
+    if (settings.soundOn !== false) playSound(settings.soundId);
     st.showToast(`⏰ ${t.time} — ${t.title}`);
     if ('Notification' in window && Notification.permission === 'granted') {
       try { new Notification(`⏰ ${t.time} — ${t.title}`, { tag: k, body: 'Планер' }); } catch { /* нет разрешения */ }

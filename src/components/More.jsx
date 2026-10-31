@@ -6,7 +6,7 @@ import { useTimers } from '../timers.js';
 import { api } from '../api.js';
 import { buildExport, exportPrompt, parseImport } from '../lib/exportImport.js';
 import { seedDemo } from '../lib/demo.js';
-import { playAlarm, unlockAudio } from '../lib/audio.js';
+import { BUILTIN_SOUNDS, playSound, unlockAudio, saveCustomAlarm, clearCustomAlarm, getCtx } from '../lib/audio.js';
 import { monthKey, MONTHS_NOM } from '../lib/dates.js';
 
 export default function More() {
@@ -251,6 +251,28 @@ function SettingsScreen() {
     }
   };
 
+  const onSoundFile = async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    if (f.size > 3 * 1024 * 1024) {
+      showToast('Файл больше 3 МБ — выберите покороче', 'err');
+      return;
+    }
+    try {
+      const c = getCtx();
+      if (!c) throw new Error('нет аудио');
+      await c.decodeAudioData(await f.arrayBuffer()); // проверяем, что это аудио
+      await saveCustomAlarm(f);
+      unlockAudio();
+      saveSettings({ soundId: 'custom', soundName: f.name });
+      playSound('custom');
+      showToast(`Свой звук: ${f.name}`);
+    } catch {
+      showToast('Не удалось прочитать аудио — попробуйте mp3/ogg/wav', 'err');
+    }
+  };
+
   const setupBot = async () => {
     setBotState('Настраиваю…');
     try {
@@ -315,7 +337,7 @@ function SettingsScreen() {
             onClick={() => saveSettings({ soundOn: settings.soundOn === false })}>
             🔔 Звук {settings.soundOn !== false ? 'вкл' : 'выкл'}
           </button>
-          <button className="chip" onClick={() => { unlockAudio(); playAlarm(); }}>Проверить звук</button>
+          <button className="chip" onClick={() => { unlockAudio(); playSound(settings.soundId); }}>Проверить звук</button>
           {'Notification' in window && Notification.permission !== 'granted' && (
             <button className="chip" onClick={async () => {
               const p = await Notification.requestPermission();
@@ -323,6 +345,36 @@ function SettingsScreen() {
             }}>Разрешить уведомления</button>
           )}
         </div>
+
+        <label className="field-label">Мелодия</label>
+        {BUILTIN_SOUNDS.map((s) => (
+          <div key={s.id} className="row slim" style={{ cursor: 'pointer', alignItems: 'center' }}
+            onClick={() => saveSettings({ soundId: s.id })}>
+            <button className="chip" onClick={(e) => { e.stopPropagation(); unlockAudio(); playSound(s.id); }}>▶</button>
+            <div className="row-main"><div className="row-title">{s.name}</div></div>
+            {(settings.soundId || 'alarm') === s.id && <b style={{ color: 'var(--accent)' }}>✓</b>}
+          </div>
+        ))}
+        {settings.soundName && (
+          <div className="row slim" style={{ cursor: 'pointer', alignItems: 'center' }}
+            onClick={() => saveSettings({ soundId: 'custom' })}>
+            <button className="chip" onClick={(e) => { e.stopPropagation(); unlockAudio(); playSound('custom'); }}>▶</button>
+            <div className="row-main">
+              <div className="row-title">Свой звук</div>
+              <div className="muted small">{settings.soundName}</div>
+            </div>
+            {settings.soundId === 'custom' && <b style={{ color: 'var(--accent)' }}>✓</b>}
+            <button className="chip" title="Удалить свой звук"
+              onClick={(e) => { e.stopPropagation(); clearCustomAlarm(); saveSettings({ soundId: 'alarm', soundName: null }); }}>×</button>
+          </div>
+        )}
+        <div className="chips">
+          <label className="chip" style={{ cursor: 'pointer' }}>
+            ⬆ Загрузить свой звук…
+            <input type="file" accept="audio/*,.mp3,.ogg,.wav,.m4a" hidden onChange={onSoundFile} />
+          </label>
+        </div>
+
         <label className="field-label">Предупреждать заранее</label>
         <div className="chips">
           {[0, 5, 10].map((m) => (
@@ -332,7 +384,7 @@ function SettingsScreen() {
             </button>
           ))}
         </div>
-        <div className="muted small">Планер прозвенит, когда наступает время задачи (пока он открыт). Если бот подключён — в ту же минуту придёт и сообщение в Telegram, даже с закрытым приложением.</div>
+        <div className="muted small">Планер прозвенит, когда наступает время задачи (пока он открыт). Если бот подключён — в ту же минуту придёт и сообщение в Telegram, даже с закрытым приложением. Загруженный файл хранится на устройстве; на других устройствах выберите мелодию заново.</div>
       </div>
 
       <div className="card">
