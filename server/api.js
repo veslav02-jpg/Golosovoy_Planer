@@ -54,6 +54,17 @@ export async function handleApi(request, env, ctx) {
     return telegramSetup(request, env);
   }
 
+  // Текущее состояние вебхука по мнению Telegram — для экрана настроек
+  if (path === '/api/telegram/status' && method === 'GET') {
+    if (!env.BOT_TOKEN) return json({ error: 'BOT_TOKEN не настроен на сервере' }, 500);
+    try {
+      const info = await tgApi(env.BOT_TOKEN, 'getWebhookInfo', {});
+      return json({ webhook: info.result || null });
+    } catch (e) {
+      return json({ webhook: { error: e?.message } });
+    }
+  }
+
   if (path === '/api/notion/connect' && method === 'POST') {
     const body = await request.json().catch(() => ({}));
     return connectNotion(env, userId, String(body.secret || ''), String(body.page || ''));

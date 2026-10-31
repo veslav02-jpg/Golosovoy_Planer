@@ -212,9 +212,33 @@ function SettingsScreen() {
   const showToast = useStore((s) => s.showToast);
   const setOnboardingDone = useStore((s) => s.setOnboardingDone);
   const [botState, setBotState] = useState('');
+  const [botStatus, setBotStatus] = useState(null);
   const [notion, setNotion] = useState({ secret: '', page: '' });
   const [notionState, setNotionState] = useState('');
   const [showKey, setShowKey] = useState(false);
+
+  // Актуальный статус вебхука — подгружается сам при открытии настроек
+  useEffect(() => {
+    let live = true;
+    api.get('/api/telegram/status')
+      .then((r) => { if (live) setBotStatus(r.webhook); })
+      .catch(() => { if (live) setBotStatus({ error: 'не удалось получить статус' }); });
+    return () => { live = false; };
+  }, []);
+
+  const webhookLines = (w) => {
+    if (!w) return [];
+    const lines = [];
+    if (w.error) lines.push(`⚠ Не удалось узнать состояние вебхука: ${w.error}`);
+    if (w.url) {
+      lines.push(`Вебхук: ${w.url}`);
+      if (w.last_error_message) lines.push(`⚠ Последняя ошибка Telegram: ${w.last_error_message}${w.last_error_date ? ` (${new Date(w.last_error_date * 1000).toLocaleString('ru-RU')})` : ''}`);
+      if (w.pending_update_count > 0) lines.push(`Необработанных сообщений: ${w.pending_update_count}`);
+    } else if (!w.error) {
+      lines.push('Вебхук ещё не установлен — нажмите кнопку ниже.');
+    }
+    return lines;
+  };
 
   const copyKey = async () => {
     try {
@@ -230,16 +254,8 @@ function SettingsScreen() {
     setBotState('Настраиваю…');
     try {
       const r = await api.post('/api/telegram/setup');
-      const lines = r.results.map((x) => `${x.method}: ${x.ok ? 'ок' : 'ошибка' + (x.error ? ` (${x.error})` : '')}`);
-      const w = r.webhook;
-      if (w?.url) {
-        lines.push(`Вебхук: ${w.url}`);
-        if (w.last_error_message) lines.push(`⚠ Последняя ошибка Telegram: ${w.last_error_message} (${w.last_error_date ? new Date(w.last_error_date * 1000).toLocaleString('ru-RU') : ''})`);
-        if (w.pending_update_count > 0) lines.push(`Необработанных сообщений: ${w.pending_update_count}`);
-      } else if (w?.error) {
-        lines.push(`⚠ Не удалось узнать состояние вебхука: ${w.error}`);
-      }
-      setBotState(lines.join('\n'));
+      setBotState(r.results.map((x) => `${x.method}: ${x.ok ? 'ок' : 'ошибка' + (x.error ? ` (${x.error})` : '')}`).join('\n'));
+      if (r.webhook) setBotStatus(r.webhook);
     } catch (e) {
       setBotState(`Ошибка: ${e.message}`);
     }
@@ -295,6 +311,11 @@ function SettingsScreen() {
         <label className="field-label">Telegram-бот</label>
         <div className="muted small">Один раз после деплоя: поставит вебхук, кнопку меню и команды.</div>
         <button className="btn small" onClick={setupBot}>Подключить бота к планеру</button>
+        {botStatus && (
+          <div className="muted small" style={{ whiteSpace: 'pre-line' }}>
+            Статус: {'\n'}{webhookLines(botStatus).join('\n')}
+          </div>
+        )}
         {botState && <div className="muted small" style={{ whiteSpace: 'pre-line' }}>{botState}</div>}
       </div>
 

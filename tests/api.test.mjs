@@ -144,6 +144,24 @@ test('внешние автоматизации: X-Service-Key + X-Telegram-User
   assert.equal(bad.status, 401);
 });
 
+test('/api/telegram/status показывает состояние вебхука', async () => {
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('/getWebhookInfo')) {
+      return new Response(JSON.stringify({ ok: true, result: { url: 'http://x/api/telegram/webhook', pending_update_count: 0 } }), { headers: { 'Content-Type': 'application/json' } });
+    }
+    return new Response(JSON.stringify({ ok: true, result: true }), { headers: { 'Content-Type': 'application/json' } });
+  };
+  try {
+    const res = await worker.fetch(jsonReq('http://x/api/telegram/status', { headers: h() }), env, makeCtx());
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.webhook.url, 'http://x/api/telegram/webhook');
+  } finally {
+    globalThis.fetch = real;
+  }
+});
+
 test('/api/telegram/setup ставит вебхук, кнопку меню и команды', async () => {
   const calls = [];
   const real = globalThis.fetch;

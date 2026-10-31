@@ -18,7 +18,11 @@ function showFatal(label) {
     document.body.appendChild(el);
   };
 }
-window.addEventListener('error', showFatal('Ошибка'));
+window.addEventListener('error', (e) => {
+  // «Script error.» без деталей — шум кросс-доменных скриптов (например, скрипта Telegram), не падение приложения
+  if (!e.error && (e.message === 'Script error.' || !e.message)) return;
+  showFatal('Ошибка')(e);
+});
 window.addEventListener('unhandledrejection', showFatal('Promise'));
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
