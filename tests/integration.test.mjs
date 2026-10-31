@@ -178,6 +178,33 @@ test('пустая расшифровка голосового — бот про
   assert.match(sent[0].body.text, /Не расслышал/);
 });
 
+test('cron: напоминание о задаче приходит в её минуту, один раз', async () => {
+  const now = moscowNow();
+  const remMin = (now.minutes + 2) % 1440;
+  const time = `${String(Math.floor(remMin / 60)).padStart(2, '0')}:${String(remMin % 60).padStart(2, '0')}`;
+  const task = { id: 'rem1', title: 'Встреча', date: now.date, time, duration_min: 30, updated_at: new Date().toISOString() };
+  await worker.fetch(jsonReq('http://x/api/tasks/sync', { method: 'POST', headers: h(), body: { tasks: [task] } }), env, makeCtx());
+
+  const ctx = makeCtx();
+  await worker.scheduled({}, env, ctx);
+  await ctx.flushed();
+  let sent = tgCalls.filter((c) => c.url.includes('/sendMessage'));
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].body.text, /Сейчас по плану/);
+  assert.match(sent[0].body.text, /Встреча/);
+
+  // задача выполнена — напоминание больше не приходит
+  await worker.fetch(jsonReq('http://x/api/tasks/sync', {
+    method: 'POST', headers: h(),
+    body: { tasks: [{ ...task, done: true, updated_at: new Date(Date.now() + 1000).toISOString() }] },
+  }), env, makeCtx());
+  const ctx2 = makeCtx();
+  await worker.scheduled({}, env, ctx2);
+  await ctx2.flushed();
+  sent = tgCalls.filter((c) => c.url.includes('/sendMessage'));
+  assert.equal(sent.length, 1);
+});
+
 // ---------- Notion ----------
 
 async function connectNotion() {

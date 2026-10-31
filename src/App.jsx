@@ -4,6 +4,8 @@ import { startSync, verifyKey } from './sync.js';
 import { authTelegram } from './api.js';
 import { useTimers, beep } from './timers.js';
 import { useUI } from './ui.js';
+import { unlockAudio } from './lib/audio.js';
+import { startReminders } from './reminders.js';
 import Dock from './components/Dock.jsx';
 import Today from './components/Today.jsx';
 import Plans from './components/Plans.jsx';
@@ -72,6 +74,22 @@ export default function App() {
     mq.addEventListener('change', apply);
     return () => mq.removeEventListener('change', apply);
   }, [theme, tgScheme]);
+
+  // Звук: браузеры отпирают аудио только после жеста пользователя
+  useEffect(() => {
+    const unlock = () => unlockAudio();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
+  // Напоминания о задачах (будильник) — после входа
+  useEffect(() => {
+    if (authState === 'ok') startReminders();
+  }, [authState]);
 
   // Тик таймеров
   useEffect(() => {

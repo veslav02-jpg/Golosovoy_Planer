@@ -11,6 +11,8 @@ export const DEFAULT_SETTINGS = {
   headLimit: 4,
   peakStart: '10:00',
   peakEnd: '13:00',
+  soundOn: true,
+  remindBefore: 0,
 };
 
 export const useStore = create(persist((set, get) => ({

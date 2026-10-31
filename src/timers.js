@@ -1,6 +1,7 @@
 // Таймеры: локальные, не синхронизируются. Фокус 25/50, параллельные побочные.
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { playBeep } from './lib/audio.js';
 
 export const useTimers = create(persist((set, get) => ({
   timers: [], // {id, label, total (сек), endsAt, paused, remaining, done}
@@ -71,19 +72,6 @@ export const useTimers = create(persist((set, get) => ({
   setSound(v) { set({ soundOn: v }); },
 }), { name: 'planner-timers' }));
 
-let audioCtx = null;
 export function beep() {
-  try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    o.connect(g);
-    g.connect(audioCtx.destination);
-    o.frequency.value = 880;
-    g.gain.setValueAtTime(0.001, audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.2, audioCtx.currentTime + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
-    o.start();
-    o.stop(audioCtx.currentTime + 0.85);
-  } catch { /* без звука */ }
+  playBeep(880, 0.8);
 }

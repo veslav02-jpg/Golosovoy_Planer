@@ -6,6 +6,7 @@ import { useTimers } from '../timers.js';
 import { api } from '../api.js';
 import { buildExport, exportPrompt, parseImport } from '../lib/exportImport.js';
 import { seedDemo } from '../lib/demo.js';
+import { playAlarm, unlockAudio } from '../lib/audio.js';
 import { monthKey, MONTHS_NOM } from '../lib/dates.js';
 
 export default function More() {
@@ -305,6 +306,33 @@ function SettingsScreen() {
         <label className="field-label">Лимит глубокой работы, ч/день</label>
         <input type="number" min="1" max="12" className="input" value={settings.headLimit}
           onChange={(e) => saveSettings({ headLimit: Number(e.target.value) || 4 })} />
+      </div>
+
+      <div className="card">
+        <label className="field-label">Напоминания (будильник)</label>
+        <div className="chips">
+          <button className={`chip ${settings.soundOn !== false ? 'on' : ''}`}
+            onClick={() => saveSettings({ soundOn: settings.soundOn === false })}>
+            🔔 Звук {settings.soundOn !== false ? 'вкл' : 'выкл'}
+          </button>
+          <button className="chip" onClick={() => { unlockAudio(); playAlarm(); }}>Проверить звук</button>
+          {'Notification' in window && Notification.permission !== 'granted' && (
+            <button className="chip" onClick={async () => {
+              const p = await Notification.requestPermission();
+              showToast(p === 'granted' ? 'Уведомления разрешены' : 'Уведомления не разрешены', p === 'granted' ? 'ok' : 'err');
+            }}>Разрешить уведомления</button>
+          )}
+        </div>
+        <label className="field-label">Предупреждать заранее</label>
+        <div className="chips">
+          {[0, 5, 10].map((m) => (
+            <button key={m} className={`chip ${(Number(settings.remindBefore) || 0) === m ? 'on' : ''}`}
+              onClick={() => saveSettings({ remindBefore: m })}>
+              {m === 0 ? 'точно в срок' : `за ${m} мин`}
+            </button>
+          ))}
+        </div>
+        <div className="muted small">Планер прозвенит, когда наступает время задачи (пока он открыт). Если бот подключён — в ту же минуту придёт и сообщение в Telegram, даже с закрытым приложением.</div>
       </div>
 
       <div className="card">
