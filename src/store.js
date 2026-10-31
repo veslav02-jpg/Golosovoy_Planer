@@ -17,6 +17,7 @@ export const useStore = create(persist((set, get) => ({
   key: null,
   user: null,
   authState: 'loading', // loading | need-key | ok
+  authError: null,
   tasks: {},
   items: {},
   lastRev: 0,

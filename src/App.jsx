@@ -41,8 +41,7 @@ export default function App() {
         authTelegram(tg.initData)
           .then(() => startSync())
           .catch((e) => {
-            useStore.getState().showToast(e.message, 'err');
-            useStore.setState({ authState: 'need-key' });
+            useStore.setState({ authState: 'need-key', authError: `Приложение открыто в Telegram, но сервер не принял вход: ${e.message}` });
           });
         setTgScheme(tg.colorScheme === 'dark' ? 'dark' : 'light');
         tg.onEvent('themeChanged', () => setTgScheme(tg.colorScheme === 'dark' ? 'dark' : 'light'));

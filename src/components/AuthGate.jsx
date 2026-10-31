@@ -28,10 +28,22 @@ export default function AuthGate() {
       <div className="auth-card glass">
         <div className="auth-logo">🗓</div>
         <h1>Планер</h1>
+        {useStore.getState().authError && (
+          <div className="auth-error">{useStore.getState().authError}</div>
+        )}
         <p className="muted">
-          В браузере нужен ключ из Mini App:
-          откройте планер в Telegram → <b>Настройки → Ключ для браузера → Скопировать</b> и вставьте сюда.
-          Ключ вставляется один раз.
+          <b>Ключ выдаётся автоматически при первом входе из Telegram.</b>
+        </p>
+        <ol className="auth-steps muted">
+          <li>Откройте чат с вашим ботом в Telegram (удобно: web.telegram.org).</li>
+          <li>Нажмите кнопку меню у поля ввода — «Открыть планер» (или /start и кнопку в ответе).</li>
+          <li>Планер откроется внутри Telegram и сам вас авторизует.</li>
+          <li>Дальше: Настройки → Ключ для браузера → Скопировать — и вставьте его здесь один раз.</li>
+        </ol>
+        <p className="muted small">
+          В обычном браузере без ключа войти нельзя — это доступ к вашим задачам.
+          Если вы внутри Telegram и всё равно видите этот экран — перезагрузите страницу:
+          возможно, скрипт Telegram не успел загрузиться.
         </p>
         <input
           className="input"

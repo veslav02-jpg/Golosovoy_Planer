@@ -471,6 +471,8 @@ textarea.input { resize: vertical; }
 .auth-card { max-width: 420px; width: 100%; border-radius: 24px; padding: 28px 24px; text-align: center; box-shadow: var(--shadow); }
 .auth-logo { font-size: 44px; }
 .auth-error { color: var(--danger); font-size: 13px; margin: 8px 0; }
+.auth-steps { text-align: left; margin: 8px 0 4px; padding-left: 20px; }
+.auth-steps li { margin: 4px 0; }
 .spinner {
   width: 36px; height: 36px;
   border: 3px solid var(--panel-flat);
