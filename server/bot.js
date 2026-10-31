@@ -126,6 +126,7 @@ async function transcribe(env, voice) {
   const b64 = bufToB64(await res.arrayBuffer());
   // Схемы whisper различаются: turbo/v3 ждут audio, старый whisper — file. Пробуем по очереди.
   let lastErr = null;
+  let succeeded = false;
   for (const params of [
     { audio: b64, language: 'ru' },
     { audio: b64 },
@@ -133,13 +134,15 @@ async function transcribe(env, voice) {
   ]) {
     try {
       const out = await env.AI.run(WHISPER, params);
+      succeeded = true;
       const text = String(out?.text ?? out?.result?.text ?? '').trim();
       if (text) return text;
-      lastErr = lastErr || new Error('Whisper не вернул текст');
+      break; // модель ответила, но тишина — не перебираем схемы
     } catch (e) {
       lastErr = e;
     }
   }
+  if (succeeded) return ''; // расшифровалось в пустоту — пусть бот попросит повторить
   throw lastErr || new Error('Whisper не вернул текст');
 }
 
