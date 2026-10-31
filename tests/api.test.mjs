@@ -95,7 +95,7 @@ test('last-write-wins: старая правка не затирает нову�
 test('надгробия: удаление доезжает по pull и не воскресает', async () => {
   const t = { id: 't1', title: 'X', updated_at: new Date().toISOString() };
   await worker.fetch(jsonReq('http://x/api/tasks/sync', { method: 'POST', body: { tasks: [t] }, headers: h() }), env, makeCtx());
-  await worker.fetch(jsonReq('http://x/api/tasks/sync', { method: 'POST', body: { tasks: [{ ...t, deleted: true, updated_at: new Date().toISOString() }] }, headers: h() }), env, makeCtx());
+  await worker.fetch(jsonReq('http://x/api/tasks/sync', { method: 'POST', body: { tasks: [{ ...t, deleted: true, updated_at: new Date(Date.now() + 1000).toISOString() }] }, headers: h() }), env, makeCtx());
   const pull = await worker.fetch(jsonReq('http://x/api/pull', { headers: h() }), env, makeCtx());
   const data = await pull.json();
   assert.equal(data.tasks[0].deleted, true);
@@ -163,7 +163,7 @@ test('/api/telegram/setup ставит вебхук, кнопку меню и к
     const webhookBody = JSON.parse(calls[0].opts.body);
     assert.equal(webhookBody.url, 'http://x/api/telegram/webhook');
     assert.equal(webhookBody.secret_token, await sha256Hex(`webhook:${env.BOT_TOKEN}`));
-    assert.equal(data.webhook.ok, true); // getWebhookInfo вернулся
+    assert.equal(data.webhook.url, 'http://x/api/telegram/webhook'); // getWebhookInfo вернулся
   } finally {
     globalThis.fetch = real;
   }
