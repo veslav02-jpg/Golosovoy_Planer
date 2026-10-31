@@ -72,14 +72,15 @@ export function makeCtx() {
   };
 }
 
-// Валидная подпись initData, как её делает Telegram
-export async function signInitData(user, botToken) {
+// Валидная подпись initData, как её делает Telegram (opts.signature — поле современных клиентов)
+export async function signInitData(user, botToken, opts = {}) {
   const enc = new TextEncoder();
   const params = new URLSearchParams({
     auth_date: String(Math.floor(Date.now() / 1000)),
     query_id: 'AAtest',
     user: JSON.stringify(user),
   });
+  if (opts.signature) params.set('signature', opts.signature);
   const dcs = [...params.entries()]
     .sort(([a], [b]) => (a < b ? -1 : 1))
     .map(([k, v]) => `${k}=${v}`)

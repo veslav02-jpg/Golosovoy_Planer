@@ -43,6 +43,27 @@ test('поддельная подпись initData отклоняется', asyn
   assert.equal(res.status, 401);
 });
 
+test('initData с полем signature (современные клиенты) проходит проверку', async () => {
+  const initData = await signInitData({ id: 555, first_name: 'Сиг' }, env.BOT_TOKEN, { signature: 'c2lnbmF0dXJl' });
+  const res = await worker.fetch(
+    jsonReq('http://x/api/auth/telegram', { method: 'POST', body: { initData } }),
+    env, makeCtx(),
+  );
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.user.id, '555');
+});
+
+test('токен с пробелом по краям всё равно проходит проверку', async () => {
+  const initData = await signInitData({ id: 556, first_name: 'Ток' }, env.BOT_TOKEN);
+  const env2 = makeEnv({ botToken: `  ${env.BOT_TOKEN} \n` });
+  const res = await worker.fetch(
+    jsonReq('http://x/api/auth/telegram', { method: 'POST', body: { initData } }),
+    env2, makeCtx(),
+  );
+  assert.equal(res.status, 200);
+});
+
 test('создание задачи через sync и выдача через pull', async () => {
   const task = { id: 't1', title: 'Первая', date: '2026-11-01', time: '10:00', duration_min: 60, updated_at: new Date().toISOString() };
   const res = await worker.fetch(jsonReq('http://x/api/tasks/sync', { method: 'POST', body: { tasks: [task] }, headers: h() }), env, makeCtx());

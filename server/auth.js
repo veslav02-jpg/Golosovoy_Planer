@@ -7,19 +7,38 @@ import { ensureSchema } from './db.js';
 
 export async function verifyInitData(initData, botToken) {
   if (!initData || !botToken) return null;
-  const params = new URLSearchParams(initData);
-  const hash = params.get('hash');
+  const token = String(botToken).trim(); // защита от пробела/переноса при вставке секрета
+  const fields = [];
+  let hash = null;
+  for (const chunk of String(initData).split('&')) {
+    if (!chunk) continue;
+    const eq = chunk.indexOf('=');
+    const key = eq === -1 ? chunk : chunk.slice(0, eq);
+    const rawVal = eq === -1 ? '' : chunk.slice(eq + 1);
+    let val;
+    try {
+      val = decodeURIComponent(rawVal);
+    } catch {
+      val = rawVal;
+    }
+    if (key === 'hash') hash = val;
+    else fields.push([key, val]);
+  }
   if (!hash) return null;
-  params.delete('hash');
-  params.delete('signature');
-  const dcs = [...params.entries()]
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([k, v]) => `${k}=${v}`)
-    .join('\n');
-  const expected = await hmacWebAppData(dcs, botToken);
-  if (!safeEqual(expected, hash)) return null;
+
+  // data-check-string: все поля, кроме hash, отсортированные по имени.
+  // Новые клиенты присылают ещё и signature — принимаем оба соглашения:
+  // подпись считается и с signature в строке, и без него.
+  fields.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  const dcsAll = fields.map(([k, v]) => `${k}=${v}`).join('\n');
+  const dcsNoSig = fields.filter(([k]) => k !== 'signature').map(([k, v]) => `${k}=${v}`).join('\n');
+  const withSig = await hmacWebAppData(dcsAll, token);
+  const withoutSig = await hmacWebAppData(dcsNoSig, token);
+  if (!safeEqual(withSig, hash) && !safeEqual(withoutSig, hash)) return null;
+
   try {
-    const user = JSON.parse(params.get('user') || 'null');
+    const userField = fields.find(([k]) => k === 'user');
+    const user = JSON.parse(userField ? userField[1] : 'null');
     if (!user || !user.id) return null;
     return user;
   } catch {

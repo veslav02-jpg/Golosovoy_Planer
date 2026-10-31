@@ -105,5 +105,5 @@ export async function tgApi(token, method, payload) {
 
 // Секрет вебхука выводится из токена бота хешем
 export async function webhookSecret(botToken) {
-  return sha256Hex(`webhook:${botToken}`);
+  return sha256Hex(`webhook:${String(botToken).trim()}`);
 }
