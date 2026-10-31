@@ -31,10 +31,21 @@ async function processUpdate(env, update, origin) {
   const chatId = String(msg.chat.id);
 
   let text = null;
-  if (msg.voice || msg.audio) {
-    text = await transcribe(env, msg.voice || msg.audio);
-  } else if (typeof msg.text === 'string') {
-    text = msg.text;
+  try {
+    if (msg.voice || msg.audio) {
+      text = await transcribe(env, msg.voice || msg.audio);
+      if (!text) {
+        await sendMessage(env, chatId, 'Не расслышал ни слова в голосовом. Запишите ещё раз или напишите текстом.').catch(() => {});
+        return;
+      }
+    } else if (typeof msg.text === 'string') {
+      text = msg.text;
+    }
+  } catch (e) {
+    // причина — прямо в чат: лимит нейронов, сбой AI и т.п.
+    console.error('bot transcribe:', e?.stack || e);
+    await sendMessage(env, chatId, `Не смог расшифровать голосовое: ${String(e?.message || e).slice(0, 200)}`).catch(() => {});
+    return;
   }
   if (text == null) return;
   text = text.trim();

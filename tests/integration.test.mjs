@@ -161,6 +161,23 @@ test('Llama завернула JSON в ```json фенс — задача сох�
   assert.equal(t.time, '10:00');
 });
 
+test('голосовое при сбое AI — бот отвечает причиной, а не молчит', async () => {
+  env.AI = { async run() { throw new Error('you have exceeded your daily neurons limit'); } };
+  await sendWebhook({ message: { chat: { id: 777 }, voice: { file_id: 'f2', duration: 2 } } });
+  const sent = tgCalls.filter((c) => c.url.includes('/sendMessage'));
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].body.text, /Не смог расшифровать голосовое/);
+  assert.match(sent[0].body.text, /neurons limit/);
+});
+
+test('пустая расшифровка голосового — бот просит повторить', async () => {
+  env.AI = { async run() { return { text: '   ' }; } };
+  await sendWebhook({ message: { chat: { id: 777 }, voice: { file_id: 'f3', duration: 1 } } });
+  const sent = tgCalls.filter((c) => c.url.includes('/sendMessage'));
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].body.text, /Не расслышал/);
+});
+
 // ---------- Notion ----------
 
 async function connectNotion() {
