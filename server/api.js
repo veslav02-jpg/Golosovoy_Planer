@@ -245,5 +245,13 @@ async function telegramSetup(request, env) {
       results.push({ method, ok: false, error: e?.message });
     }
   }
-  return json({ ok: results.every((r) => r.ok), results, origin });
+  // что Telegram реально думает о вебхуке — для диагностики на экране настроек
+  let webhook = null;
+  try {
+    const info = await tgApi(env.BOT_TOKEN, 'getWebhookInfo', {});
+    webhook = info.result || null;
+  } catch (e) {
+    webhook = { error: e?.message };
+  }
+  return json({ ok: results.every((r) => r.ok), results, origin, webhook });
 }

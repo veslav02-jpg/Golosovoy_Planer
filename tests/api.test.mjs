@@ -156,10 +156,11 @@ test('/api/telegram/setup ставит вебхук, кнопку меню и к
     const data = await res.json();
     assert.equal(data.ok, true);
     const methods = calls.map((c) => c.url.split('/').pop());
-    assert.deepEqual(methods, ['setWebhook', 'setChatMenuButton', 'setMyCommands']);
+    assert.deepEqual(methods, ['setWebhook', 'setChatMenuButton', 'setMyCommands', 'getWebhookInfo']);
     const webhookBody = JSON.parse(calls[0].opts.body);
     assert.equal(webhookBody.url, 'http://x/api/telegram/webhook');
     assert.equal(webhookBody.secret_token, await sha256Hex(`webhook:${env.BOT_TOKEN}`));
+    assert.equal(data.webhook.ok, true); // getWebhookInfo вернулся
   } finally {
     globalThis.fetch = real;
   }
