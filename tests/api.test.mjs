@@ -149,6 +149,9 @@ test('/api/telegram/setup ставит вебхук, кнопку меню и к
   const real = globalThis.fetch;
   globalThis.fetch = async (url, opts) => {
     calls.push({ url: String(url), opts });
+    if (String(url).includes('/getWebhookInfo')) {
+      return new Response(JSON.stringify({ ok: true, result: { url: 'http://x/api/telegram/webhook', pending_update_count: 0 } }), { headers: { 'Content-Type': 'application/json' } });
+    }
     return new Response(JSON.stringify({ ok: true, result: true }), { headers: { 'Content-Type': 'application/json' } });
   };
   try {
