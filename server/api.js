@@ -240,7 +240,7 @@ async function telegramSetup(request, env) {
   const origin = new URL(request.url).origin;
   const secret = await webhookSecret(env.BOT_TOKEN);
   const calls = [
-    ['setWebhook', { url: `${origin}/api/telegram/webhook`, secret_token: secret, allowed_updates: ['message'] }],
+    ['setWebhook', { url: `${origin}/api/telegram/webhook`, secret_token: secret, allowed_updates: ['message', 'callback_query'] }],
     ['setChatMenuButton', { menu_button: { type: 'web_app', text: 'Планер', web_app: { url: origin } } }],
     ['setMyCommands', { commands: [
       { command: 'start', description: 'Открыть планер' },

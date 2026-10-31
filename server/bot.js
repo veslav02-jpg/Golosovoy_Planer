@@ -26,6 +26,14 @@ export async function handleWebhook(request, env, ctx) {
 }
 
 async function processUpdate(env, update, origin) {
+  // Нажатие inline-кнопки «удалить»
+  if (update.callback_query) {
+    await handleCallback(env, update.callback_query).catch((e) => {
+      console.error('bot callback:', e?.stack || e);
+    });
+    return;
+  }
+
   const msg = update.message;
   if (!msg || !msg.chat) return;
   const chatId = String(msg.chat.id);
@@ -53,13 +61,22 @@ async function processUpdate(env, update, origin) {
 
   if (text.startsWith('/start')) {
     await sendMessage(env, chatId,
-      'Пришли задачи текстом или голосом — я раскидаю их по планеру. Например: «завтра в 11 созвон с клиентом на час».',
+      'Пришли задачи текстом или голосом — я раскидаю их по планеру. Например: «завтра в 11 созвон с клиентом на час».\n\nУдалить: «удали созвон» — найду по названию и удалю (если похожих несколько — предложу кнопки).',
       keyboard(origin));
     return;
   }
   if (text.startsWith('/add')) text = text.slice(4).trim();
   if (!text) {
     await sendMessage(env, chatId, 'Напиши задачу после команды: /add созвон завтра в 11');
+    return;
+  }
+
+  // «Удали созвон» / «отмени встречу» — удаление существующей задачи
+  if (DELETE_RE.test(text)) {
+    await handleDeleteIntent(env, chatId, text).catch(async (e) => {
+      console.error('bot delete:', e?.stack || e);
+      await sendMessage(env, chatId, 'Не получилось удалить. Попробуй уточнить название: «удали созвон на завтра».');
+    });
     return;
   }
 
@@ -106,6 +123,86 @@ function keyboard(origin) {
   return {
     inline_keyboard: [[{ text: '🗓 Открыть планер', web_app: { url: origin } }]],
   };
+}
+
+// ---------- удаление голосом/текстом ----------
+
+// \b в JS не работает с кириллицей — границы слова проверяем lookahead/lookbehind
+const DELETE_RE = /^\s*(?:удали(?:ть)?|убери(?:ть)?|отмени(?:ть)?|сними(?:ть)?|delete|remove)(?![а-яёa-z])/i;
+const DELETE_FILLER = /(?<![а-яёa-z])(?:задачу|задача|задачи|запис[уью]|пункт|плиз|пожалуйста|из\s+планера|в\s+планере|на\s+сегодня|на\s+завтра)(?![а-яёa-z])/gi;
+
+async function handleDeleteIntent(env, chatId, text) {
+  await getOrCreateKey(env, chatId);
+  let query = text.replace(DELETE_RE, ' ').replace(DELETE_FILLER, ' ').replace(/\s+/g, ' ').trim();
+  if (query.length < 2) {
+    await sendMessage(env, chatId, 'Напиши, что удалить: «удали созвон» — и я найду задачу по названию.');
+    return;
+  }
+
+  const rows = await env.DB.prepare(
+    'SELECT * FROM tasks WHERE user_id = ? AND deleted = 0 ORDER BY date IS NULL, date, time LIMIT 200',
+  ).bind(chatId).all();
+  const q = query.toLowerCase();
+  const matches = (rows.results || []).filter((t) => (t.title || '').toLowerCase().includes(q));
+
+  if (matches.length === 0) {
+    const recent = (rows.results || []).slice(0, 6).map((t) => `• ${t.title}${t.date ? ` (${fmtDateRu(t.date)}${t.time ? ' ' + t.time : ''})` : ''}`);
+    await sendMessage(env, chatId,
+      `Не нашёл задачу по «${query}». Вот что есть сейчас:\n${recent.join('\n') || '(пусто)'}\n\nПопробуй ещё раз, назвав точнее.`);
+    return;
+  }
+
+  if (matches.length === 1) {
+    const t = matches[0];
+    await deleteTaskRow(env, chatId, t.id);
+    await sendMessage(env, chatId, `Удалил: «${t.title}»${t.date ? ` (${fmtDateRu(t.date)}${t.time ? ' ' + t.time : ''})` : ''}. Из планера исчезнет в течение 30 секунд.`);
+    return;
+  }
+
+  // несколько похожих — даём выбрать кнопками
+  const keyboardRows = matches.slice(0, 8).map((t) => [{
+    text: `✖ ${t.title}${t.date ? ` (${fmtDateRu(t.date)}${t.time ? ' ' + t.time : ''})` : ''}`,
+    callback_data: `del:${t.id}`,
+  }]);
+  await tgApi(env.BOT_TOKEN, 'sendMessage', {
+    chat_id: chatId,
+    text: `Нашёл несколько задач по «${query}» — какую удалить?`,
+    reply_markup: { inline_keyboard: keyboardRows },
+  });
+}
+
+async function deleteTaskRow(env, userId, taskId) {
+  await env.DB.prepare(
+    'UPDATE tasks SET deleted = 1, updated_at = ?, rev = ? WHERE user_id = ? AND id = ?',
+  ).bind(nowISO(), await nextRev(env, userId), userId, taskId).run();
+}
+
+async function handleCallback(env, cq) {
+  const data = String(cq.data || '');
+  if (!data.startsWith('del:')) return;
+  const taskId = data.slice(4);
+  const userId = String(cq.from?.id || '');
+  const chatId = String(cq.message?.chat?.id || '');
+  if (!userId || userId !== chatId) {
+    await tgApi(env.BOT_TOKEN, 'answerCallbackQuery', { callback_query_id: cq.id, text: 'Можно удалять только свои задачи' }).catch(() => {});
+    return;
+  }
+  const row = await env.DB.prepare('SELECT * FROM tasks WHERE user_id = ? AND id = ?').bind(userId, taskId).first();
+  if (!row || Number(row.deleted)) {
+    await tgApi(env.BOT_TOKEN, 'answerCallbackQuery', { callback_query_id: cq.id, text: 'Задача уже не существует' }).catch(() => {});
+    return;
+  }
+  await deleteTaskRow(env, userId, taskId);
+  await tgApi(env.BOT_TOKEN, 'answerCallbackQuery', { callback_query_id: cq.id, text: 'Удалено' }).catch(() => {});
+  const label = `«${row.title}»${row.date ? ` (${fmtDateRu(row.date)}${row.time ? ' ' + row.time : ''})` : ''}`;
+  try {
+    await tgApi(env.BOT_TOKEN, 'editMessageText', {
+      chat_id: chatId, message_id: cq.message.message_id,
+      text: `Удалил: ${label}. Из планера исчезнет в течение 30 секунд.`,
+    });
+  } catch {
+    await sendMessage(env, chatId, `Удалил: ${label}.`);
+  }
 }
 
 async function sendMessage(env, chatId, text, replyMarkup) {

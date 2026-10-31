@@ -205,6 +205,64 @@ test('cron: напоминание о задаче приходит в её ми
   assert.equal(sent.length, 1);
 });
 
+test('«удали …» — одна подходящая задача удаляется сразу', async () => {
+  const now = new Date().toISOString();
+  await worker.fetch(jsonReq('http://x/api/tasks/sync', {
+    method: 'POST', headers: h(),
+    body: { tasks: [{ id: 'd1', title: 'Созвон с командой', date: '2026-11-05', time: '11:00', updated_at: now }] },
+  }), env, makeCtx());
+
+  await sendWebhook({ message: { chat: { id: 777 }, text: 'удали созвон' } });
+
+  const sent = tgCalls.filter((c) => c.url.includes('/sendMessage'));
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].body.text, /Удалил/);
+  assert.match(sent[0].body.text, /Созвон с командой/);
+
+  const pull = await worker.fetch(jsonReq('http://x/api/pull', { headers: h() }), env, makeCtx());
+  const data = await pull.json();
+  assert.equal(data.tasks.find((t) => t.id === 'd1').deleted, true, 'надгробие в базе');
+});
+
+test('«удали …» — несколько похожих: кнопки, удаление по callback', async () => {
+  const now = new Date().toISOString();
+  await worker.fetch(jsonReq('http://x/api/tasks/sync', {
+    method: 'POST', headers: h(),
+    body: { tasks: [
+      { id: 'm1', title: 'Созвон с командой', date: '2026-11-05', time: '11:00', updated_at: now },
+      { id: 'm2', title: 'Созвон с клиентом', date: '2026-11-06', time: '15:00', updated_at: now },
+    ] },
+  }), env, makeCtx());
+
+  await sendWebhook({ message: { chat: { id: 777 }, text: 'удали задачу созвон' } });
+  const sent = tgCalls.filter((c) => c.url.includes('/sendMessage'));
+  assert.equal(sent.length, 1);
+  const buttons = sent[0].body.reply_markup.inline_keyboard;
+  assert.equal(buttons.length, 2);
+  assert.match(buttons[0][0].text, /Созвон/);
+  assert.match(buttons[0][0].callback_data, /^del:m[12]$/);
+
+  // нажали кнопку «удалить m1»
+  await sendWebhook({ callback_query: { id: 'cb1', data: 'del:m1', from: { id: 777 }, message: { chat: { id: 777 }, message_id: 42 } } });
+  const answers = tgCalls.filter((c) => c.url.includes('/answerCallbackQuery'));
+  assert.equal(answers.length, 1);
+  const edits = tgCalls.filter((c) => c.url.includes('/editMessageText'));
+  assert.equal(edits.length, 1);
+  assert.match(edits[0].body.text, /Удалил: «Созвон с командой»/);
+
+  const pull = await worker.fetch(jsonReq('http://x/api/pull', { headers: h() }), env, makeCtx());
+  const data = await pull.json();
+  assert.equal(data.tasks.find((t) => t.id === 'm1').deleted, true);
+  assert.equal(data.tasks.find((t) => t.id === 'm2').deleted, false);
+});
+
+test('«удали …» — ничего не нашлось: бот показывает, что есть', async () => {
+  await sendWebhook({ message: { chat: { id: 777 }, text: 'удали абракадабра' } });
+  const sent = tgCalls.filter((c) => c.url.includes('/sendMessage'));
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].body.text, /Не нашёл задачу/);
+});
+
 // ---------- Notion ----------
 
 async function connectNotion() {
