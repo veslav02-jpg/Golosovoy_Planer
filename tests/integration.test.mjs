@@ -91,8 +91,8 @@ test('вебхук с неверным секретом отклоняется',
 test('голосовое → Whisper → Llama → задача в базе и ответ бота', async () => {
   await sendWebhook({ message: { chat: { id: 777 }, voice: { file_id: 'f1', duration: 3 } } });
 
-  // Whisper получил base64 файла, Llama — контекст и текст
-  assert.ok(aiCalls.some((c) => c.model.includes('whisper') && typeof c.params.file === 'string'));
+  // Whisper получил base64 аудио (схема audio), Llama — контекст и текст
+  assert.ok(aiCalls.some((c) => c.model.includes('whisper') && typeof c.params.audio === 'string'));
   const llama = aiCalls.filter((c) => c.model.includes('llama'));
   assert.equal(llama.length, 2, 'json_schema + фолбэк без response_format');
   assert.ok(!llama[1].params.response_format);

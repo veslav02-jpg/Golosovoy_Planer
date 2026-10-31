@@ -124,13 +124,23 @@ async function transcribe(env, voice) {
   const res = await fetch(`https://api.telegram.org/file/bot${env.BOT_TOKEN}/${path}`);
   if (!res.ok) throw new Error(`Не удалось скачать голосовое: ${res.status}`);
   const b64 = bufToB64(await res.arrayBuffer());
-  let out;
-  try {
-    out = await env.AI.run(WHISPER, { file: b64, language: 'ru' });
-  } catch {
-    out = await env.AI.run(WHISPER, { file: b64 });
+  // Схемы whisper различаются: turbo/v3 ждут audio, старый whisper — file. Пробуем по очереди.
+  let lastErr = null;
+  for (const params of [
+    { audio: b64, language: 'ru' },
+    { audio: b64 },
+    { file: b64, language: 'ru' },
+  ]) {
+    try {
+      const out = await env.AI.run(WHISPER, params);
+      const text = String(out?.text ?? out?.result?.text ?? '').trim();
+      if (text) return text;
+      lastErr = lastErr || new Error('Whisper не вернул текст');
+    } catch (e) {
+      lastErr = e;
+    }
   }
-  return String(out?.text || '').trim();
+  throw lastErr || new Error('Whisper не вернул текст');
 }
 
 // ---------- Llama-разбор ----------
